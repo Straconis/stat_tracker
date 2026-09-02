@@ -1,0 +1,9 @@
+﻿.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+*.spec
+tracker_data.json
+c64f595f-9679-487e-8d3a-6bff9fae0a76.png
