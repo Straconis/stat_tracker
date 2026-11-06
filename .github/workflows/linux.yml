@@ -1,0 +1,56 @@
+name: Linux portable build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: sudo apt-get update && sudo apt-get install -y python3-tk xvfb
+      - run: python -m pip install -r requirements-build.txt
+      - run: python -m pytest -q
+      - run: xvfb-run -a python app.py --smoke-test
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/stat-tracker-test
+      - run: ./scripts/package-linux.sh
+      - name: Verify packaged app and archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/stat-tracker-unpack"
+          tar -xzf dist/stat-tracker-linux-x86_64.tar.gz -C "$RUNNER_TEMP/stat-tracker-unpack"
+          ! tar -tvzf dist/stat-tracker-linux-x86_64.tar.gz | grep -E '^[lh]'
+          xvfb-run -a "$RUNNER_TEMP/stat-tracker-unpack/stat-tracker-linux-x86_64/stat-tracker" --smoke-test
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/stat-tracker-packaged-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stat-tracker-linux-x86_64
+          path: |
+            dist/stat-tracker-linux-x86_64.tar.gz
+            dist/SHA256SUMS.txt
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: stat-tracker-linux-x86_64
+          path: dist
+      - name: Attach Linux assets to the existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" dist/stat-tracker-linux-x86_64.tar.gz dist/SHA256SUMS.txt --clobber

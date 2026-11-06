@@ -1,10 +1,12 @@
-﻿import json
-import os
+import json
+import sys
+import webbrowser
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
 from version import APP_NAME, APP_VERSION
+from runtime_paths import asset_path, data_directory
 from models import Player
 from persistence import PersistenceMixin
 from theme import GROUP_COLORS, ThemeMixin
@@ -19,17 +21,9 @@ class App(ThemeMixin, PersistenceMixin):
     def __init__(self, root):
         self.root = root
 
-        # Windows application/window icon.
         try:
-            icon_path = Path(__file__).with_name(
-                "stat_tracker.ico"
-            )
-
-            if icon_path.exists():
-                self.root.iconbitmap(
-                    default=str(icon_path)
-                )
-
+            self.window_icon = tk.PhotoImage(file=str(asset_path("stat_tracker.png")))
+            self.root.iconphoto(True, self.window_icon)
         except (OSError, tk.TclError):
             pass
 
@@ -37,17 +31,7 @@ class App(ThemeMixin, PersistenceMixin):
         self.dark_mode = False
         self.locked = True
 
-        appdata_root = Path(
-            os.environ.get(
-                "LOCALAPPDATA",
-                str(Path.home() / "AppData" / "Local")
-            )
-        )
-
-        self.data_dir = (
-            appdata_root
-            / APP_NAME
-        )
+        self.data_dir = data_directory()
 
         self.data_dir.mkdir(
             parents=True,
@@ -59,25 +43,16 @@ class App(ThemeMixin, PersistenceMixin):
             / "tracker_data.json"
         )
 
-        # Migrate the old development save file on first run.
-        legacy_save = Path(__file__).with_name(
-            "tracker_data.json"
-        )
-
-        if (
-            not self.save_file.exists()
-            and legacy_save.exists()
-        ):
-            try:
-                self.save_file.write_text(
-                    legacy_save.read_text(
-                        encoding="utf-8"
-                    ),
-                    encoding="utf-8"
-                )
-
-            except OSError:
-                pass
+        # Preserve source-checkout saves and the Windows-style path used by older Linux runs.
+        legacy_paths = [asset_path("tracker_data.json")]
+        if sys.platform != "win32":
+            legacy_paths.append(Path.home() / "AppData" / "Local" / APP_NAME / "tracker_data.json")
+        for legacy_save in legacy_paths:
+            if not self.save_file.exists() and legacy_save.is_file():
+                try:
+                    self.save_file.write_text(legacy_save.read_text(encoding="utf-8"), encoding="utf-8")
+                except OSError:
+                    pass
 
         self.counter_names = [
             f"Counter {i + 1}"
@@ -106,6 +81,7 @@ class App(ThemeMixin, PersistenceMixin):
         )
 
         self.build_ui()
+        self.build_branding()
         self.apply_theme()
         self.rebuild_grid()
 
@@ -242,6 +218,8 @@ class App(ThemeMixin, PersistenceMixin):
         # Bind the mouse wheel at the application level so
         # Entries, Buttons, and other child widgets cannot
         # swallow the scrolling event.
+        self.root.bind_all("<Button-4>", lambda _event: self.canvas.yview_scroll(-1, "units"))
+        self.root.bind_all("<Button-5>", lambda _event: self.canvas.yview_scroll(1, "units"))
         self.root.bind_all(
             "<MouseWheel>",
             self.on_mousewheel
@@ -397,6 +375,18 @@ class App(ThemeMixin, PersistenceMixin):
     # =========================================================
     # GRID
     # =========================================================
+
+    def build_branding(self):
+        self.brand_footer = tk.Frame(self.outer, bg=self.canvas_bg())
+        self.brand_footer.pack(side="bottom", fill="x", pady=(8, 0))
+        self.brand_image = tk.PhotoImage(file=str(asset_path("assets/branding/straconis-software-wordmark.png"))).subsample(8, 8)
+        self.brand_link = tk.Label(self.brand_footer, image=self.brand_image,
+                                   bg=self.canvas_bg(), cursor="hand2", takefocus=True,
+                                   name="straconis_software")
+        self.brand_link.pack(side="left")
+        self.brand_link.bind("<Button-1>", lambda _event: webbrowser.open("https://straconis.dev"))
+        self.brand_link.bind("<Return>", lambda _event: webbrowser.open("https://straconis.dev"))
+        self.brand_link.bind("<space>", lambda _event: webbrowser.open("https://straconis.dev"))
 
     def rebuild_grid(self):
         for widget in self.grid_frame.winfo_children():
@@ -1271,8 +1261,11 @@ class App(ThemeMixin, PersistenceMixin):
 
 
 if __name__ == "__main__":
+    smoke_test = "--smoke-test" in sys.argv
     root = tk.Tk()
-
+    if smoke_test:
+        root.withdraw()
     app = App(root)
-
+    if smoke_test:
+        root.after(200, root.destroy)
     root.mainloop()
