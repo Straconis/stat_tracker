@@ -84,6 +84,9 @@ class ThemeMixin:
             bg=bg
         )
 
+        self.brand_footer.configure(bg=bg)
+        self.brand_link.configure(bg=bg)
+
         self.canvas.configure(
             bg=bg
         )

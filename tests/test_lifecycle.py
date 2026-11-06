@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -293,6 +293,7 @@ def test_no_persistence_code_deletes_save_directory(tmp_path):
     assert save_file.exists()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows environment diagnostic")
 def test_real_localappdata_environment_is_available():
     """
     Diagnostic only: verifies the environment Python sees.

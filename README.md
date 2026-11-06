@@ -1,4 +1,4 @@
-﻿# Stat Tracker
+# Stat Tracker
 
 ![Stat Tracker](stat_tracker.png)
 
@@ -131,9 +131,42 @@ Custom user-interface widgets.
 **version.py**  
 Application name and version information.
 
+## Linux builds
+
+Stat Tracker runs natively on Linux with Python 3.11+ and Tkinter:
+
+```bash
+sudo apt-get install python3-tk python3-venv
+python3 app.py
+```
+
+The UI includes the standard Straconis Software wordmark; clicking it or focusing it and pressing Return opens https://straconis.dev. Linux mouse wheels use Button-4 / Button-5 bindings alongside the existing MouseWheel handler.
+
+Linux state lives in `$XDG_DATA_HOME/stat-tracker/tracker_data.json`, or `~/.local/share/stat-tracker/tracker_data.json`. Existing Windows-style Linux saves under `~/AppData/Local/Stat Tracker/` and development saves are copied on first launch when no new save exists. Windows keeps its original LOCALAPPDATA path. macOS uses `~/Library/Application Support/Stat Tracker/` (not packaged or manually tested here).
+
+Create a standalone Linux x86_64 or aarch64 archive on that architecture:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-build.txt
+.venv/bin/python -m pytest -q
+PYTHON=.venv/bin/python ./scripts/package-linux.sh
+```
+
+The output is `dist/stat-tracker-linux-<architecture>.tar.gz` plus `dist/SHA256SUMS.txt`. Extract it and run `stat-tracker` from its directory. Keep `_internal/` beside the executable. No separate Python/Tkinter installation is required for the bundle; desktop system libraries are still required. `stat-tracker --smoke-test` constructs the UI, checks bundled images, and exits without saving tracker state; use an isolated XDG_DATA_HOME when testing.
+
+The Linux workflow tests source and packaged UI startup under Xvfb and uploads CI artifacts. Builds use Ubuntu 22.04 for broader glibc compatibility. Tag runs attach the archive and checksum to an already-created GitHub release. A locally built archive inherits the build host's glibc requirements; the Debian 13 preview requires glibc 2.41. Build in CI for an older baseline. No new release is created automatically.
+
 ## Windows Builds
 
 Stat Tracker can be packaged as a standalone Windows executable and distributed with the included Inno Setup installer script.
+
+Include the PNG window icon and wordmark in Windows bundles too:
+
+```powershell
+python -m PyInstaller --onefile --windowed --name StatTracker --icon stat_tracker.ico --add-data "stat_tracker.png;." --add-data "assets/branding/straconis-software-wordmark.png;assets/branding" app.py
+```
+
 
 Generated build and distribution directories are intentionally excluded from source control.
 
